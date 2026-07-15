@@ -17,13 +17,87 @@ const MIME = {
 
 let cache = { expiresAt: 0, payload: null };
 
-async function yahooQuote(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`;
+async function fetchJson(url, headers = {}, timeoutMs = 25_000) {
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HynixSpreadMonitor/1.0)' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HynixSpreadMonitor/1.0)', ...headers },
+    signal: AbortSignal.timeout(timeoutMs)
+  });
+  if (!response.ok) throw new Error(`${new URL(url).hostname}: HTTP ${response.status}`);
+  return response.json();
+}
+
+function numericPrice(value) {
+  const parsed = Number(String(value).replace(/[^0-9.-]/g, ''));
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`Invalid price: ${value}`);
+  return parsed;
+}
+
+async function nasdaqQuote() {
+  const json = await fetchJson('https://api.nasdaq.com/api/quote/SKHY/info?assetclass=stocks', {
+    Accept: 'application/json, text/plain, */*',
+    Origin: 'https://www.nasdaq.com',
+    Referer: 'https://www.nasdaq.com/'
+  });
+  const data = json?.data;
+  const primary = data?.primaryData;
+  if (!primary?.lastSalePrice) throw new Error('Nasdaq SKHY: no quote available');
+  return {
+    symbol: SYMBOLS.adr,
+    price: numericPrice(primary.lastSalePrice),
+    previousClose: null,
+    currency: 'USD',
+    exchange: data.exchange ?? 'Nasdaq',
+    marketState: data.marketStatus ?? 'UNKNOWN',
+    timestamp: null,
+    source: 'Nasdaq'
+  };
+}
+
+async function naverQuote() {
+  const json = await fetchJson('https://polling.finance.naver.com/api/realtime/domestic/stock/000660', {
+    Accept: 'application/json, text/plain, */*',
+    Referer: 'https://finance.naver.com/'
+  }, 20_000);
+  const data = json?.datas?.[0];
+  if (!data?.closePrice) throw new Error('Naver 000660: no quote available');
+  return {
+    symbol: SYMBOLS.krx,
+    price: numericPrice(data.closePrice),
+    previousClose: null,
+    currency: 'KRW',
+    exchange: data.stockExchangeType?.nameEng ?? 'KOSPI',
+    marketState: data.marketStatus ?? 'UNKNOWN',
+    timestamp: data.localTradedAt ? Math.floor(Date.parse(data.localTradedAt) / 1000) : null,
+    source: 'Naver Finance'
+  };
+}
+
+async function exchangeRateQuote() {
+  const json = await fetchJson('https://open.er-api.com/v6/latest/USD', { Accept: 'application/json' });
+  const price = Number(json?.rates?.KRW);
+  if (!Number.isFinite(price) || price <= 0) throw new Error('USD/KRW: no quote available');
+  return {
+    symbol: SYMBOLS.fx,
+    price,
+    previousClose: null,
+    currency: 'KRW',
+    exchange: 'ExchangeRate-API',
+    marketState: 'DAILY',
+    timestamp: json.time_last_update_unix ?? null,
+    source: 'ExchangeRate-API'
+  };
+}
+
+async function fetchYahooQuote(host, symbol) {
+  const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`;
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+      'Accept': 'application/json,text/plain,*/*'
+    },
     signal: AbortSignal.timeout(8_000)
   });
-  if (!response.ok) throw new Error(`${symbol}: data provider returned ${response.status}`);
+  if (!response.ok) throw new Error(`${host} ${symbol}: HTTP ${response.status}`);
   const json = await response.json();
   const result = json?.chart?.result?.[0];
   const meta = result?.meta;
@@ -42,6 +116,31 @@ async function yahooQuote(symbol) {
   };
 }
 
+async function yahooQuote(symbol) {
+  const errors = [];
+  for (const host of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+    try {
+      return await fetchYahooQuote(host, symbol);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  throw new Error(errors.join(' | '));
+}
+
+async function withFallback(primary, yahooSymbol) {
+  try {
+    return await primary();
+  } catch (primaryError) {
+    try {
+      const quote = await yahooQuote(yahooSymbol);
+      return { ...quote, source: 'Yahoo Finance (fallback)' };
+    } catch (fallbackError) {
+      throw new Error(`${primaryError instanceof Error ? primaryError.message : primaryError} | ${fallbackError instanceof Error ? fallbackError.message : fallbackError}`);
+    }
+  }
+}
+
 async function getSpreadPayload(threshold) {
   const now = Date.now();
   if (cache.payload && cache.expiresAt > now) {
@@ -49,9 +148,9 @@ async function getSpreadPayload(threshold) {
   }
 
   const [adr, krx, fx] = await Promise.all([
-    yahooQuote(SYMBOLS.adr),
-    yahooQuote(SYMBOLS.krx),
-    yahooQuote(SYMBOLS.fx)
+    withFallback(nasdaqQuote, SYMBOLS.adr),
+    withFallback(naverQuote, SYMBOLS.krx),
+    withFallback(exchangeRateQuote, SYMBOLS.fx)
   ]);
   const spread = calculateSpread({ adrUsd: adr.price, krxKrw: krx.price, usdKrw: fx.price });
   const oldestTimestamp = Math.min(...[adr.timestamp, krx.timestamp, fx.timestamp].filter(Number.isFinite));
