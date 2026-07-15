@@ -1,0 +1,14 @@
+{
+  "name": "sk-hynix-adr-spread-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SK hynix Korean ordinary share vs Nasdaq ADR premium monitor",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
