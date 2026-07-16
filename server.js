@@ -2,11 +2,13 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { calculateSpread, quoteAgeMinutes } from './calculator.js';
+import { calculatePerpSpread, calculateSpread, quoteAgeMinutes } from './calculator.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
 const SYMBOLS = Object.freeze({ adr: 'SKHY', krx: '000660.KS', fx: 'KRW=X' });
+const PERP_SYMBOLS = Object.freeze({ adr: 'xyz:SKHY', ordinary: 'xyz:SKHX', dex: 'xyz' });
+const HYPERLIQUID_INFO_URL = 'https://api.hyperliquid.xyz/info';
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -16,6 +18,7 @@ const MIME = {
 };
 
 let cache = { expiresAt: 0, payload: null };
+let perpCache = { expiresAt: 0, payload: null };
 
 async function fetchJson(url, headers = {}, timeoutMs = 25_000) {
   const response = await fetch(url, {
@@ -26,10 +29,74 @@ async function fetchJson(url, headers = {}, timeoutMs = 25_000) {
   return response.json();
 }
 
+async function postJson(url, body, timeoutMs = 12_000) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'HynixSpreadMonitor/1.1'
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs)
+  });
+  if (!response.ok) throw new Error(`${new URL(url).hostname}: HTTP ${response.status}`);
+  return response.json();
+}
+
 function numericPrice(value) {
   const parsed = Number(String(value).replace(/[^0-9.-]/g, ''));
   if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`Invalid price: ${value}`);
   return parsed;
+}
+
+function optionalNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hyperliquidQuote(asset, context) {
+  const markPrice = numericPrice(context?.markPx);
+  const oraclePrice = numericPrice(context?.oraclePx);
+  const openInterestBase = optionalNumber(context?.openInterest);
+  return {
+    symbol: asset.name,
+    markPrice,
+    midPrice: optionalNumber(context?.midPx),
+    oraclePrice,
+    previousDayPrice: optionalNumber(context?.prevDayPx),
+    fundingRate: optionalNumber(context?.funding),
+    premiumRate: optionalNumber(context?.premium),
+    openInterestBase,
+    openInterestUsd: openInterestBase === null ? null : openInterestBase * markPrice,
+    dayVolumeUsd: optionalNumber(context?.dayNtlVlm),
+    impactPrices: Array.isArray(context?.impactPxs) ? context.impactPxs.map(optionalNumber) : null,
+    maxLeverage: asset.maxLeverage ?? null,
+    currency: 'USD',
+    exchange: 'Hyperliquid XYZ HIP-3',
+    source: 'Hyperliquid'
+  };
+}
+
+async function hyperliquidPerpQuotes() {
+  const response = await postJson(HYPERLIQUID_INFO_URL, {
+    type: 'metaAndAssetCtxs',
+    dex: PERP_SYMBOLS.dex
+  });
+  const [metadata, contexts] = response;
+  const universe = metadata?.universe;
+  if (!Array.isArray(universe) || !Array.isArray(contexts) || universe.length !== contexts.length) {
+    throw new Error('Hyperliquid: malformed XYZ market response');
+  }
+
+  const quoteFor = (symbol) => {
+    const index = universe.findIndex((asset) => asset.name === symbol);
+    if (index < 0) throw new Error(`Hyperliquid: ${symbol} market is unavailable`);
+    return hyperliquidQuote(universe[index], contexts[index]);
+  };
+  const adr = quoteFor(PERP_SYMBOLS.adr);
+  const ordinary = quoteFor(PERP_SYMBOLS.ordinary);
+  return { adr, ordinary };
 }
 
 async function nasdaqQuote() {
@@ -166,6 +233,35 @@ async function getSpreadPayload(threshold) {
   return { ...payload, thresholdPct: threshold, alert: Math.abs(spread.premiumPct) >= threshold };
 }
 
+async function getPerpSpreadPayload(threshold) {
+  const now = Date.now();
+  if (perpCache.payload && perpCache.expiresAt > now) {
+    return {
+      ...perpCache.payload,
+      thresholdPct: threshold,
+      alert: Math.abs(perpCache.payload.spread.premiumPct) >= threshold
+    };
+  }
+
+  const quotes = await hyperliquidPerpQuotes();
+  const spread = calculatePerpSpread({
+    adrMarkUsd: quotes.adr.markPrice,
+    ordinaryMarkUsd: quotes.ordinary.markPrice,
+    adrOracleUsd: quotes.adr.oraclePrice,
+    ordinaryOracleUsd: quotes.ordinary.oraclePrice
+  });
+  const payload = {
+    market: 'Hyperliquid XYZ HIP-3',
+    symbols: PERP_SYMBOLS,
+    ratio: { adrPerOrdinaryShare: 10, ordinarySharePerAdr: 0.1 },
+    quotes,
+    spread,
+    fetchedAt: new Date().toISOString()
+  };
+  perpCache = { expiresAt: now + 10_000, payload };
+  return { ...payload, thresholdPct: threshold, alert: Math.abs(spread.premiumPct) >= threshold };
+}
+
 function sendJson(res, status, value) {
   res.writeHead(status, { 'content-type': MIME['.json'], 'cache-control': 'no-store' });
   res.end(JSON.stringify(value));
@@ -194,6 +290,11 @@ const server = http.createServer(async (req, res) => {
       const rawThreshold = Number(url.searchParams.get('threshold') ?? 10);
       const threshold = Number.isFinite(rawThreshold) ? Math.min(100, Math.max(0, rawThreshold)) : 10;
       return sendJson(res, 200, await getSpreadPayload(threshold));
+    }
+    if (url.pathname === '/api/perp-spread') {
+      const rawThreshold = Number(url.searchParams.get('threshold') ?? 10);
+      const threshold = Number.isFinite(rawThreshold) ? Math.min(100, Math.max(0, rawThreshold)) : 10;
+      return sendJson(res, 200, await getPerpSpreadPayload(threshold));
     }
     if (await serveStatic(url.pathname, res)) return;
     sendJson(res, 404, { error: 'Not found' });

@@ -22,12 +22,12 @@
 
     <section class="hero">
       <div>
-        <p class="eyebrow">NASDAQ · KRX · FX</p>
+        <p class="eyebrow">HYPERLIQUID · XYZ · HIP-3</p>
         <h1><span data-i18n="heroTitle">海力士 ADR</span><br><em data-i18n="heroAccent">跨市场价差</em></h1>
-        <p class="intro" data-i18n="intro">比较 SKHY 与韩国 000660 正股的汇率调整价值。10 份 ADR 对应 1 股韩国普通股。</p>
+        <p class="intro" data-i18n="intro">比较 xyz:SKHY 与 xyz:SKHX ÷ 10 的标记价格。两个永续合约在同一市场连续交易。</p>
       </div>
       <div class="premium-card" id="premiumCard">
-        <div class="card-label"><span data-i18n="currentPremium">当前溢价</span><span id="signalBadge" class="badge neutral">等待行情</span></div>
+        <div class="card-label"><span data-i18n="currentPremium">永续跨合约溢价</span><span id="signalBadge" class="badge neutral">等待行情</span></div>
         <div class="premium" id="premiumValue">—</div>
         <div class="gap" id="gapValue">每份 ADR 价差 —</div>
         <div class="meter"><span id="meterFill"></span><i id="meterPoint"></i></div>
@@ -37,21 +37,38 @@
 
     <section class="quote-grid">
       <article class="quote-card">
-        <div class="ticker"><span class="flag us">US</span><div><b>SKHY</b><small>Nasdaq ADR</small></div></div>
+        <div class="ticker"><span class="flag perp">ADR</span><div><b>xyz:SKHY</b><small data-i18n="adrPerp">1 ADR 永续</small></div></div>
         <strong id="adrPrice">—</strong><span class="currency">USD / ADR</span>
-        <p id="adrTime">行情时间 —</p>
+        <p id="adrDetails">Oracle — · Funding —</p>
       </article>
       <article class="quote-card">
-        <div class="ticker"><span class="flag kr">KR</span><div><b>000660</b><small data-i18n="krxOrdinary">KRX 普通股</small></div></div>
-        <strong id="krxPrice">—</strong><span class="currency" data-i18n="krwPerShare">KRW / 股</span>
-        <p id="krxTime">行情时间 —</p>
+        <div class="ticker"><span class="flag perp">ORD</span><div><b>xyz:SKHX</b><small data-i18n="ordinaryPerp">1 股普通股永续</small></div></div>
+        <strong id="ordinaryPrice">—</strong><span class="currency">USD / SHARE</span>
+        <p id="ordinaryDetails">Oracle — · Funding —</p>
       </article>
       <article class="quote-card fair">
-        <div class="ticker"><span class="flag calc">≈</span><div><b data-i18n="fairValue">折算价值</b><small data-i18n="includingFx">含实时 USD/KRW</small></div></div>
+        <div class="ticker"><span class="flag calc">÷10</span><div><b data-i18n="fairValue">每份 ADR 对应价值</b><small data-i18n="includingFx">SKHX 标记价 ÷ 10</small></div></div>
         <strong id="fairPrice">—</strong><span class="currency">USD / ADR</span>
-        <p id="fxPrice">USD/KRW —</p>
+        <p id="parityDetails">MARK-TO-MARK</p>
       </article>
     </section>
+
+    <section class="metrics-grid">
+      <article><span data-i18n="oracleParity">预言机跨合约溢价</span><strong id="oraclePremium">—</strong></article>
+      <article><span data-i18n="adrOracleDeviation">SKHY 标记/预言机偏离</span><strong id="adrOracleDeviation">—</strong></article>
+      <article><span data-i18n="openInterest">SKHY 持仓量</span><strong id="openInterest">—</strong></article>
+      <article><span data-i18n="dayVolume">SKHY 24h 成交额</span><strong id="dayVolume">—</strong></article>
+    </section>
+
+    <details class="spot-panel">
+      <summary><span data-i18n="spotComparison">现货市场对照（交易时段可能错位）</span><span>＋</span></summary>
+      <div class="spot-grid">
+        <article><span>Nasdaq SKHY</span><strong id="spotAdr">—</strong><small>USD / ADR</small></article>
+        <article><span>KRX 000660</span><strong id="spotKrx">—</strong><small>KRW / SHARE</small></article>
+        <article><span>USD/KRW</span><strong id="spotFx">—</strong><small>FX</small></article>
+        <article><span data-i18n="spotPremium">现货折算溢价</span><strong id="spotPremium">—</strong><small id="spotStatus" data-i18n="spotLoading">等待现货行情</small></article>
+      </div>
+    </details>
 
     <section class="control-panel">
       <div class="panel-head">
@@ -62,15 +79,14 @@
         <span><span data-i18n="thresholdPrefix">绝对价差达到</span> <b id="thresholdLabel">10%</b> <span data-i18n="thresholdSuffix">时报警</span></span>
         <input id="threshold" type="range" min="1" max="40" step="1" value="10">
       </label>
-      <div class="notice" id="notice"><span>i</span><p data-i18n="marketNotice">韩国与美国交易时段不重叠。盘中显示可能使用另一市场的最近成交价，并不代表可以即时套利。</p></div>
+      <div class="notice" id="notice"><span>i</span><p data-i18n="marketNotice">永续合约虽然连续交易，但预言机在正股休市时可能更新较慢；价差也会受到资金费率和流动性影响。</p></div>
     </section>
 
     <details class="manual-panel">
-      <summary><span data-i18n="manualSummary">行情不可用？使用手动价格计算</span> <span>＋</span></summary>
+      <summary><span data-i18n="manualSummary">接口不可用？使用手动永续价格计算</span> <span>＋</span></summary>
       <form id="manualForm">
-        <label><span data-i18n="manualAdrLabel">SKHY（USD）</span><input id="manualAdr" type="number" min="0" step="any" required placeholder="例如 184.51" data-i18n-placeholder="manualAdrPlaceholder"></label>
-        <label><span data-i18n="manualKrxLabel">000660（KRW）</span><input id="manualKrx" type="number" min="0" step="any" required placeholder="例如 1913000" data-i18n-placeholder="manualKrxPlaceholder"></label>
-        <label>USD/KRW<input id="manualFx" type="number" min="0" step="any" required placeholder="例如 1495" data-i18n-placeholder="manualFxPlaceholder"></label>
+        <label><span data-i18n="manualAdrLabel">xyz:SKHY 标记价（USD）</span><input id="manualAdr" type="number" min="0" step="any" required placeholder="例如 168.57" data-i18n-placeholder="manualAdrPlaceholder"></label>
+        <label><span data-i18n="manualOrdinaryLabel">xyz:SKHX 标记价（USD）</span><input id="manualOrdinary" type="number" min="0" step="any" required placeholder="例如 1251.80" data-i18n-placeholder="manualOrdinaryPlaceholder"></label>
         <button type="submit" data-i18n="calculate">计算价差</button>
       </form>
     </details>
