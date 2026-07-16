@@ -2,7 +2,7 @@
   "name": "sk-hynix-adr-spread-monitor",
   "version": "1.0.0",
   "private": true,
-  "description": "SK hynix Korean ordinary share vs Nasdaq ADR premium monitor",
+  "description": "SK hynix HIP-3 ordinary share vs ADR perpetual premium monitor",
   "type": "module",
   "engines": {
     "node": ">=20"

@@ -1,15 +1,23 @@
 # SK hynix ADR 价差检测器
 
-监测 Nasdaq `SKHY` ADR 与韩国交易所 `000660.KS` 普通股的汇率调整价差。
+主要监测 Hyperliquid XYZ HIP-3 的 `xyz:SKHY` ADR 永续与 `xyz:SKHX` 普通股永续之间的价差。旧的现货接口仍保留用于对照。
 
 ## 换算公式
 
 SK hynix 的换股关系为 10 份 ADR 对应 1 股普通股，因此：
 
 ```text
-每份 ADR 理论价值（USD）= 000660 股价（KRW）× 0.1 ÷ USD/KRW
-溢价率 = (SKHY ÷ 理论价值 - 1) × 100%
+每份 ADR 对应价值（USD）= xyz:SKHX 标记价 ÷ 10
+永续跨合约溢价率 = (xyz:SKHY 标记价 ÷ 对应价值 - 1) × 100%
 ```
+
+页面同时显示标记价、预言机价格、资金费率、持仓量与 24 小时成交额。公开只读数据来自 `POST https://api.hyperliquid.xyz/info` 的 `metaAndAssetCtxs` 请求，无需 API Key。
+
+## API
+
+- `GET /api/perp-spread?threshold=10`：主要的 HIP-3 永续价差接口。
+- `GET /api/spread?threshold=10`：保留的 Nasdaq／KRX／汇率现货对照接口。
+- `GET /api/health`：服务健康检查。
 
 ## 本地运行
 
@@ -49,7 +57,8 @@ Node.js Lab 无法单独重启 Node 进程；修改设置或代码后需要完�
 
 ## 行情与风险说明
 
-- 第一版使用 Yahoo Finance 的公开延迟行情，无需 API Key；该接口并非保证可用的交易级行情。
-- 韩国和美国市场交易时间不重叠，画面会同时显示各行情的时间戳与市场状态。
-- 新上市代码若暂时未被免费数据源收录，可展开网页中的手动模式输入三项价格。
+- 主要界面使用 Hyperliquid 的公开只读 API；接口和 HIP-3 市场仍可能暂时中断。
+- 永续合约连续交易，但预言机在美股或韩股休市时可能更新较慢。
+- 价差会受到资金费率、盘口深度和流动性影响，不代表可以无成本成交。
+- 接口不可用时，可展开网页中的手动模式输入两个永续合约的标记价格。
 - 本工具用于观察跨市场估值差，不等于存在可执行的无风险套利。
