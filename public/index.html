@@ -14,17 +14,20 @@
         <span class="brand-mark">h</span>
         <div><strong>Hynix Gap</strong><span>ADR spread monitor</span></div>
       </div>
-      <div class="live"><i></i><span id="statusText">正在连接行情</span></div>
+      <div class="header-actions">
+        <button id="languageToggle" class="language-toggle" type="button" aria-label="Switch to English">EN</button>
+        <div class="live"><i></i><span id="statusText">正在连接行情</span></div>
+      </div>
     </header>
 
     <section class="hero">
       <div>
         <p class="eyebrow">NASDAQ · KRX · FX</p>
-        <h1>海力士 ADR<br><em>跨市场价差</em></h1>
-        <p class="intro">比较 SKHY 与韩国 000660 正股的汇率调整价值。10 份 ADR 对应 1 股韩国普通股。</p>
+        <h1><span data-i18n="heroTitle">海力士 ADR</span><br><em data-i18n="heroAccent">跨市场价差</em></h1>
+        <p class="intro" data-i18n="intro">比较 SKHY 与韩国 000660 正股的汇率调整价值。10 份 ADR 对应 1 股韩国普通股。</p>
       </div>
       <div class="premium-card" id="premiumCard">
-        <div class="card-label"><span>当前溢价</span><span id="signalBadge" class="badge neutral">等待行情</span></div>
+        <div class="card-label"><span data-i18n="currentPremium">当前溢价</span><span id="signalBadge" class="badge neutral">等待行情</span></div>
         <div class="premium" id="premiumValue">—</div>
         <div class="gap" id="gapValue">每份 ADR 价差 —</div>
         <div class="meter"><span id="meterFill"></span><i id="meterPoint"></i></div>
@@ -39,12 +42,12 @@
         <p id="adrTime">行情时间 —</p>
       </article>
       <article class="quote-card">
-        <div class="ticker"><span class="flag kr">KR</span><div><b>000660</b><small>KRX 普通股</small></div></div>
-        <strong id="krxPrice">—</strong><span class="currency">KRW / 股</span>
+        <div class="ticker"><span class="flag kr">KR</span><div><b>000660</b><small data-i18n="krxOrdinary">KRX 普通股</small></div></div>
+        <strong id="krxPrice">—</strong><span class="currency" data-i18n="krwPerShare">KRW / 股</span>
         <p id="krxTime">行情时间 —</p>
       </article>
       <article class="quote-card fair">
-        <div class="ticker"><span class="flag calc">≈</span><div><b>折算价值</b><small>含实时 USD/KRW</small></div></div>
+        <div class="ticker"><span class="flag calc">≈</span><div><b data-i18n="fairValue">折算价值</b><small data-i18n="includingFx">含实时 USD/KRW</small></div></div>
         <strong id="fairPrice">—</strong><span class="currency">USD / ADR</span>
         <p id="fxPrice">USD/KRW —</p>
       </article>
@@ -52,27 +55,27 @@
 
     <section class="control-panel">
       <div class="panel-head">
-        <div><p class="eyebrow">ALERT CONTROL</p><h2>报警设置</h2></div>
-        <button id="refreshButton" type="button">刷新行情 <span>↻</span></button>
+        <div><p class="eyebrow">ALERT CONTROL</p><h2 data-i18n="alertSettings">报警设置</h2></div>
+        <button id="refreshButton" type="button"><span data-i18n="refresh">刷新行情</span> <span>↻</span></button>
       </div>
       <label class="threshold-row">
-        <span>绝对价差达到 <b id="thresholdLabel">10%</b> 时报警</span>
+        <span><span data-i18n="thresholdPrefix">绝对价差达到</span> <b id="thresholdLabel">10%</b> <span data-i18n="thresholdSuffix">时报警</span></span>
         <input id="threshold" type="range" min="1" max="40" step="1" value="10">
       </label>
-      <div class="notice" id="notice"><span>i</span><p>韩国与美国交易时段不重叠。盘中显示可能使用另一市场的最近成交价，并不代表可以即时套利。</p></div>
+      <div class="notice" id="notice"><span>i</span><p data-i18n="marketNotice">韩国与美国交易时段不重叠。盘中显示可能使用另一市场的最近成交价，并不代表可以即时套利。</p></div>
     </section>
 
     <details class="manual-panel">
-      <summary>行情不可用？使用手动价格计算 <span>＋</span></summary>
+      <summary><span data-i18n="manualSummary">行情不可用？使用手动价格计算</span> <span>＋</span></summary>
       <form id="manualForm">
-        <label>SKHY（USD）<input id="manualAdr" type="number" min="0" step="any" required placeholder="例如 184.51"></label>
-        <label>000660（KRW）<input id="manualKrx" type="number" min="0" step="any" required placeholder="例如 1913000"></label>
-        <label>USD/KRW<input id="manualFx" type="number" min="0" step="any" required placeholder="例如 1495"></label>
-        <button type="submit">计算价差</button>
+        <label><span data-i18n="manualAdrLabel">SKHY（USD）</span><input id="manualAdr" type="number" min="0" step="any" required placeholder="例如 184.51" data-i18n-placeholder="manualAdrPlaceholder"></label>
+        <label><span data-i18n="manualKrxLabel">000660（KRW）</span><input id="manualKrx" type="number" min="0" step="any" required placeholder="例如 1913000" data-i18n-placeholder="manualKrxPlaceholder"></label>
+        <label>USD/KRW<input id="manualFx" type="number" min="0" step="any" required placeholder="例如 1495" data-i18n-placeholder="manualFxPlaceholder"></label>
+        <button type="submit" data-i18n="calculate">计算价差</button>
       </form>
     </details>
 
-    <footer><span id="updatedAt">尚未更新</span><span>数据仅供监测，不构成投资建议</span></footer>
+    <footer><span id="updatedAt">尚未更新</span><span data-i18n="disclaimer">数据仅供监测，不构成投资建议</span></footer>
   </main>
   <script type="module" src="/app.js"></script>
 </body>
