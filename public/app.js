@@ -14,6 +14,7 @@ const translations = {
     apiUnavailable: 'Hyperliquid 接口不可用', manualRequired: '请手动输入', alert: '触发报警', normal: '价差正常',
     perAdrHigher: '每份 ADR 高出', perAdrLower: '每份 ADR 低于', oracle: '预言机', funding: '资金费率',
     oracleParity: '预言机跨合约溢价', adrOracleDeviation: 'SKHY 标记/预言机偏离', openInterest: 'SKHY 持仓量', dayVolume: 'SKHY 24h 成交额',
+    spotComparison: '现货市场对照（交易时段可能错位）', spotPremium: '现货折算溢价', spotLoading: '等待现货行情', spotUnavailable: '现货接口不可用',
     userInput: '用户手动输入', fetchedAt: '抓取于', calculatedAt: '手动计算于', switchLabel: 'Switch to English'
   },
   en: {
@@ -30,6 +31,7 @@ const translations = {
     apiUnavailable: 'Hyperliquid API unavailable', manualRequired: 'Enter prices manually', alert: 'Alert triggered', normal: 'Within threshold',
     perAdrHigher: 'Each ADR is above parity by', perAdrLower: 'Each ADR is below parity by', oracle: 'Oracle', funding: 'Funding',
     oracleParity: 'Oracle cross-contract premium', adrOracleDeviation: 'SKHY mark/oracle deviation', openInterest: 'SKHY open interest', dayVolume: 'SKHY 24h volume',
+    spotComparison: 'Spot-market comparison (trading hours may differ)', spotPremium: 'Spot implied premium', spotLoading: 'Waiting for spot quotes', spotUnavailable: 'Spot API unavailable',
     userInput: 'User-entered prices', fetchedAt: 'Fetched at', calculatedAt: 'Calculated at', switchLabel: '切换至中文'
   }
 };
@@ -42,6 +44,7 @@ const nodes = {
   adrDetails: $('adrDetails'), ordinaryDetails: $('ordinaryDetails'), parityDetails: $('parityDetails'),
   oraclePremium: $('oraclePremium'), adrOracleDeviation: $('adrOracleDeviation'),
   openInterest: $('openInterest'), dayVolume: $('dayVolume'), status: $('statusText'), updated: $('updatedAt'),
+  spotAdr: $('spotAdr'), spotKrx: $('spotKrx'), spotFx: $('spotFx'), spotPremium: $('spotPremium'), spotStatus: $('spotStatus'),
   threshold: $('threshold'), thresholdLabel: $('thresholdLabel'), refresh: $('refreshButton'), language: $('languageToggle')
 };
 
@@ -78,6 +81,22 @@ function render({ adr, ordinary, fairValueUsd, premiumPct, absoluteGapUsd, alert
   nodes.status.textContent = source;
 }
 
+async function refreshSpotComparison() {
+  nodes.spotStatus.textContent = t('spotLoading');
+  try {
+    const response = await fetch(`/api/spread?threshold=${nodes.threshold.value}`, { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || data.error);
+    nodes.spotAdr.textContent = `$${money(data.quotes.adr.price, 2)}`;
+    nodes.spotKrx.textContent = money(data.quotes.krx.price, 0);
+    nodes.spotFx.textContent = money(data.quotes.fx.price, 2);
+    nodes.spotPremium.textContent = percent(data.spread.premiumPct, 2);
+    nodes.spotStatus.textContent = `${t('fetchedAt')} ${new Date(data.fetchedAt).toLocaleTimeString(locale())}`;
+  } catch {
+    nodes.spotStatus.textContent = t('spotUnavailable');
+  }
+}
+
 async function refresh() {
   nodes.refresh.disabled = true;
   nodes.status.textContent = t('refreshing');
@@ -95,6 +114,7 @@ async function refresh() {
     nodes.openInterest.textContent = compactUsd(data.quotes.adr.openInterestUsd);
     nodes.dayVolume.textContent = compactUsd(data.quotes.adr.dayVolumeUsd);
     nodes.updated.textContent = `${t('fetchedAt')} ${new Date(data.fetchedAt).toLocaleString(locale())}`;
+    refreshSpotComparison();
   } catch (error) {
     nodes.status.textContent = t('apiUnavailable');
     document.querySelector('.live').classList.add('error');
