@@ -13,6 +13,8 @@ SK hynix 的换股关系为 10 份 ADR 对应 1 股普通股，因此：
 
 页面同时显示标记价、预言机价格、资金费率、持仓量与 24 小时成交额。公开只读数据来自 `POST https://api.hyperliquid.xyz/info` 的 `metaAndAssetCtxs` 请求，无需 API Key。
 
+界面支持中文、English 与 한국어，并会在浏览器中记住语言选择。
+
 ## API
 
 - `GET /api/perp-spread?threshold=10`：主要的 HIP-3 永续价差接口。

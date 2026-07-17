@@ -20,8 +20,8 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; opa
 .brand div { display: grid; gap: 2px; }.brand strong { font-size: 15px; letter-spacing: .02em; }.brand div span { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .live { border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
 .header-actions { display: flex; align-items: center; gap: 9px; }
-.language-toggle { min-width: 42px; padding: 8px 11px; border-radius: 999px; background: transparent; color: var(--text); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
-.language-toggle:hover { color: var(--orange); border-color: rgba(255,90,31,.45); }
+.language-select { min-width: 82px; padding: 8px 28px 8px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--text); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer; outline: none; }
+.language-select:hover, .language-select:focus { color: var(--orange); border-color: rgba(255,90,31,.45); }
 .live i { width: 7px; height: 7px; background: var(--green); border-radius: 50%; box-shadow: 0 0 12px var(--green); }
 .live.error i { background: var(--red); box-shadow: 0 0 12px var(--red); }
 .hero { min-height: 390px; padding: 72px 0 58px; display: grid; grid-template-columns: 1fr 430px; align-items: center; gap: 80px; }
