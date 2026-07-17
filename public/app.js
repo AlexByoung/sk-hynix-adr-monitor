@@ -71,6 +71,7 @@ const locale = () => ({ zh: 'zh-CN', en: 'en-US', ko: 'ko-KR' })[language];
 const money = (value, digits = 2) => Number(value).toLocaleString(locale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const percent = (value, digits = 3) => `${Number(value) >= 0 ? '+' : ''}${money(value, digits)}%`;
 const compactUsd = (value) => Number(value).toLocaleString(locale(), { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
+const METER_RANGE_PCT = 40;
 
 function applyLanguage() {
   document.documentElement.lang = ({ zh: 'zh-CN', en: 'en', ko: 'ko' })[language];
@@ -95,7 +96,7 @@ function render({ adr, ordinary, fairValueUsd, premiumPct, absoluteGapUsd, alert
   nodes.premium.className = `premium ${premiumPct > 0 ? 'positive' : premiumPct < 0 ? 'negative' : ''}`;
   nodes.badge.textContent = alert ? t('alert') : t('normal');
   nodes.badge.className = `badge ${alert ? 'alert' : 'ok'}`;
-  nodes.meter.style.left = `${Math.max(0, Math.min(100, 50 + premiumPct * 2.5))}%`;
+  nodes.meter.style.left = `${Math.max(0, Math.min(100, 50 + (premiumPct / METER_RANGE_PCT) * 50))}%`;
   nodes.status.textContent = source;
 }
 
