@@ -2,6 +2,11 @@
 
 主要监测 Hyperliquid XYZ HIP-3 的 `xyz:SKHY` ADR 永续与 `xyz:SKHX` 普通股永续之间的价差。旧的现货接口仍保留用于对照。
 
+扩展监测区还包括：
+
+- 长鑫科技：`xyz:CXMT` 对科创板 `688825`。
+- 宇树科技：`xyz:UNITREE` 对预定科创板代码 `688836`；上市前显示预IPO状态，A股产生有效成交价后自动启用对比。
+
 ## 换算公式
 
 SK hynix 的换股关系为 10 份 ADR 对应 1 股普通股，因此：
@@ -18,6 +23,7 @@ SK hynix 的换股关系为 10 份 ADR 对应 1 股普通股，因此：
 ## API
 
 - `GET /api/perp-spread?threshold=10`：主要的 HIP-3 永续价差接口。
+- `GET /api/extended-markets`：长鑫科技与宇树科技的 HIP-3／A股监测数据。
 - `GET /api/spread?threshold=10`：保留的 Nasdaq／KRX／汇率现货对照接口。
 - `GET /api/health`：服务健康检查。
 
