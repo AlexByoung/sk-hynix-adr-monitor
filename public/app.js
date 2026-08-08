@@ -15,6 +15,9 @@ const translations = {
     perAdrHigher: '每份 ADR 高出', perAdrLower: '每份 ADR 低于', oracle: '预言机', funding: '资金费率',
     oracleParity: '预言机跨合约溢价', adrOracleDeviation: 'SKHY 标记/预言机偏离', openInterest: 'SKHY 持仓量', dayVolume: 'SKHY 24h 成交额',
     spotComparison: '现货市场对照（交易时段可能错位）', spotPremium: '现货折算溢价', spotLoading: '等待现货行情', spotUnavailable: '现货接口不可用',
+    extendedMarkets: '扩展监测', extendedIntro: '比较 Hyperliquid 标记价与其A股预言机参考价，并同时显示真实人民币股价。', cxmtName: '长鑫科技', unitreeName: '宇树科技',
+    markOracleGap: '标记/预言机价差', perpMark: '永续标记价', oraclePrice: '预言机价', aSharePrice: 'A股价格', impliedFx: '隐含 USD/CNH', openInterestShort: '持仓量', dayVolumeShort: '24h 成交额',
+    listed: '已上市', preipo: '上市前', quoteUnavailable: '行情不可用', aShareAwaiting: '等待上市', unitreePreipoNote: '上市前显示预IPO合约；A股开始交易后将自动启用价格对比。', unitreeListedNote: 'A股已开始交易，当前显示永续合约与A股预言机的实时偏离。',
     userInput: '用户手动输入', fetchedAt: '抓取于', calculatedAt: '手动计算于'
   },
   en: {
@@ -32,6 +35,9 @@ const translations = {
     perAdrHigher: 'Each ADR is above parity by', perAdrLower: 'Each ADR is below parity by', oracle: 'Oracle', funding: 'Funding',
     oracleParity: 'Oracle cross-contract premium', adrOracleDeviation: 'SKHY mark/oracle deviation', openInterest: 'SKHY open interest', dayVolume: 'SKHY 24h volume',
     spotComparison: 'Spot-market comparison (trading hours may differ)', spotPremium: 'Spot implied premium', spotLoading: 'Waiting for spot quotes', spotUnavailable: 'Spot API unavailable',
+    extendedMarkets: 'Extended monitoring', extendedIntro: 'Compare Hyperliquid mark prices with their A-share oracle references while showing the underlying CNY share prices.', cxmtName: 'ChangXin Memory', unitreeName: 'Unitree Technology',
+    markOracleGap: 'Mark/oracle spread', perpMark: 'Perp mark', oraclePrice: 'Oracle price', aSharePrice: 'A-share price', impliedFx: 'Implied USD/CNH', openInterestShort: 'Open interest', dayVolumeShort: '24h volume',
+    listed: 'Listed', preipo: 'Pre-IPO', quoteUnavailable: 'Quote unavailable', aShareAwaiting: 'Awaiting listing', unitreePreipoNote: 'The pre-IPO perpetual is shown now; A-share comparison will activate automatically once trading begins.', unitreeListedNote: 'A-share trading is live; the card now shows the real-time perp versus A-share oracle deviation.',
     userInput: 'User-entered prices', fetchedAt: 'Fetched at', calculatedAt: 'Calculated at'
   },
   ko: {
@@ -49,6 +55,9 @@ const translations = {
     perAdrHigher: 'ADR당 환산 가치보다 높음', perAdrLower: 'ADR당 환산 가치보다 낮음', oracle: '오라클', funding: '펀딩비율',
     oracleParity: '오라클 기준 선물 간 프리미엄', adrOracleDeviation: 'SKHY 마크/오라클 괴리', openInterest: 'SKHY 미결제약정', dayVolume: 'SKHY 24시간 거래대금',
     spotComparison: '현물시장 비교(거래 시간이 다를 수 있음)', spotPremium: '현물 환산 프리미엄', spotLoading: '현물 시세 대기 중', spotUnavailable: '현물 API를 사용할 수 없음',
+    extendedMarkets: '확장 모니터링', extendedIntro: 'Hyperliquid 마크 가격과 A주 오라클 기준가를 비교하고 실제 위안화 주가도 함께 표시합니다.', cxmtName: '창신메모리', unitreeName: '유니트리 테크놀로지',
+    markOracleGap: '마크/오라클 스프레드', perpMark: '무기한 선물 마크', oraclePrice: '오라클 가격', aSharePrice: 'A주 가격', impliedFx: '내재 USD/CNH', openInterestShort: '미결제약정', dayVolumeShort: '24시간 거래대금',
+    listed: '상장됨', preipo: '상장 전', quoteUnavailable: '시세 없음', aShareAwaiting: '상장 대기', unitreePreipoNote: '현재는 프리IPO 무기한 선물을 표시하며, A주 거래가 시작되면 가격 비교가 자동으로 활성화됩니다.', unitreeListedNote: 'A주 거래가 시작되어 무기한 선물과 A주 오라클 간 실시간 괴리를 표시합니다.',
     userInput: '사용자 입력 가격', fetchedAt: '조회 시각', calculatedAt: '계산 시각'
   }
 };
@@ -100,6 +109,45 @@ function render({ adr, ordinary, fairValueUsd, premiumPct, absoluteGapUsd, alert
   nodes.status.textContent = source;
 }
 
+function renderExtendedMarket(market) {
+  const prefix = market.id;
+  const premiumNode = $(`${prefix}Premium`);
+  const statusNode = $(`${prefix}Status`);
+  const statusKey = market.listingStatus === 'listed' ? 'listed' : market.listingStatus === 'preipo' ? 'preipo' : 'quoteUnavailable';
+  statusNode.textContent = t(statusKey);
+  statusNode.className = `market-status ${market.listingStatus === 'preipo' ? 'preipo' : market.listingStatus === 'listed' ? '' : 'unavailable'}`;
+
+  premiumNode.textContent = percent(market.comparison.premiumPct, 3);
+  premiumNode.className = market.comparison.premiumPct > 0 ? 'positive' : market.comparison.premiumPct < 0 ? 'negative' : '';
+  $(`${prefix}Gap`).textContent = `${market.comparison.absoluteGapUsd >= 0 ? '+' : '-'}$${money(Math.abs(market.comparison.absoluteGapUsd), 4)}`;
+  $(`${prefix}Mark`).textContent = `$${money(market.perp.markPrice, 4)}`;
+  $(`${prefix}Oracle`).textContent = `$${money(market.perp.oraclePrice, 4)}`;
+  $(`${prefix}Stock`).textContent = market.stock.priceCny ? `¥${money(market.stock.priceCny, 2)}` : t('aShareAwaiting');
+  $(`${prefix}Fx`).textContent = market.comparison.impliedUsdCnh ? money(market.comparison.impliedUsdCnh, 4) : '—';
+  $(`${prefix}Funding`).textContent = percent(market.perp.fundingRate * 100, 4);
+  $(`${prefix}Oi`).textContent = compactUsd(market.perp.openInterestUsd);
+  $(`${prefix}Volume`).textContent = compactUsd(market.perp.dayVolumeUsd);
+
+  if (market.id === 'unitree') {
+    $('unitreeNote').textContent = t(market.listingStatus === 'listed' ? 'unitreeListedNote' : 'unitreePreipoNote');
+  }
+}
+
+async function refreshExtendedMarkets() {
+  try {
+    const response = await fetch('/api/extended-markets', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || data.error);
+    data.markets.forEach(renderExtendedMarket);
+  } catch {
+    ['cxmt', 'unitree'].forEach((prefix) => {
+      const statusNode = $(`${prefix}Status`);
+      statusNode.textContent = t('quoteUnavailable');
+      statusNode.className = 'market-status unavailable';
+    });
+  }
+}
+
 async function refreshSpotComparison() {
   nodes.spotStatus.textContent = t('spotLoading');
   try {
@@ -120,6 +168,7 @@ async function refresh() {
   nodes.refresh.disabled = true;
   nodes.status.textContent = t('refreshing');
   document.querySelector('.live').classList.remove('error');
+  refreshExtendedMarkets();
   try {
     const response = await fetch(`/api/perp-spread?threshold=${nodes.threshold.value}`, { cache: 'no-store' });
     const data = await response.json();

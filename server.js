@@ -8,6 +8,10 @@ const PORT = Number(process.env.PORT) || 3000;
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
 const SYMBOLS = Object.freeze({ adr: 'SKHY', krx: '000660.KS', fx: 'KRW=X' });
 const PERP_SYMBOLS = Object.freeze({ adr: 'xyz:SKHY', ordinary: 'xyz:SKHX', dex: 'xyz' });
+const EXTENDED_MARKETS = Object.freeze([
+  { id: 'cxmt', name: 'ChangXin Memory', perpSymbol: 'xyz:CXMT', stockSymbol: '688825', listed: true },
+  { id: 'unitree', name: 'Unitree Technology', perpSymbol: 'xyz:UNITREE', stockSymbol: '688836', listed: false }
+]);
 const HYPERLIQUID_INFO_URL = 'https://api.hyperliquid.xyz/info';
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -19,6 +23,7 @@ const MIME = {
 
 let cache = { expiresAt: 0, payload: null };
 let perpCache = { expiresAt: 0, payload: null };
+let extendedCache = { expiresAt: 0, payload: null };
 
 async function fetchJson(url, headers = {}, timeoutMs = 25_000) {
   const response = await fetch(url, {
@@ -97,6 +102,50 @@ async function hyperliquidPerpQuotes() {
   const adr = quoteFor(PERP_SYMBOLS.adr);
   const ordinary = quoteFor(PERP_SYMBOLS.ordinary);
   return { adr, ordinary };
+}
+
+async function hyperliquidQuotes(symbols) {
+  const response = await postJson(HYPERLIQUID_INFO_URL, {
+    type: 'metaAndAssetCtxs',
+    dex: PERP_SYMBOLS.dex
+  });
+  const [metadata, contexts] = response;
+  const universe = metadata?.universe;
+  if (!Array.isArray(universe) || !Array.isArray(contexts) || universe.length !== contexts.length) {
+    throw new Error('Hyperliquid: malformed XYZ market response');
+  }
+  return Object.fromEntries(symbols.map((symbol) => {
+    const index = universe.findIndex((asset) => asset.name === symbol);
+    if (index < 0) throw new Error(`Hyperliquid: ${symbol} market is unavailable`);
+    return [symbol, hyperliquidQuote(universe[index], contexts[index])];
+  }));
+}
+
+async function tencentAshareQuote(symbol) {
+  const response = await fetch(`https://qt.gtimg.cn/q=sh${symbol}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; CrossMarketMonitor/1.0)',
+      Referer: 'https://gu.qq.com/'
+    },
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw new Error(`Tencent ${symbol}: HTTP ${response.status}`);
+  const text = await response.text();
+  const encoded = text.match(/="([\s\S]*?)"/)?.[1];
+  const fields = encoded?.split('~');
+  if (!fields || fields[2] !== symbol) throw new Error(`Tencent ${symbol}: malformed quote`);
+  const price = optionalNumber(fields[3]);
+  const hasTrade = price !== null && price > 0;
+  return {
+    symbol,
+    priceCny: hasTrade ? price : null,
+    previousCloseCny: optionalNumber(fields[4]),
+    quoteTime: fields[30] || null,
+    marketState: hasTrade ? 'LISTED' : 'PRELISTING',
+    currency: 'CNY',
+    exchange: 'SSE STAR Market',
+    source: 'Tencent Finance'
+  };
 }
 
 async function nasdaqQuote() {
@@ -262,6 +311,43 @@ async function getPerpSpreadPayload(threshold) {
   return { ...payload, thresholdPct: threshold, alert: Math.abs(spread.premiumPct) >= threshold };
 }
 
+async function getExtendedMarketsPayload() {
+  const now = Date.now();
+  if (extendedCache.payload && extendedCache.expiresAt > now) return extendedCache.payload;
+
+  const perpSymbols = EXTENDED_MARKETS.map((market) => market.perpSymbol);
+  const [perps, ...stockResults] = await Promise.all([
+    hyperliquidQuotes(perpSymbols),
+    ...EXTENDED_MARKETS.map((market) => tencentAshareQuote(market.stockSymbol).catch((error) => ({
+      symbol: market.stockSymbol,
+      priceCny: null,
+      marketState: market.listed ? 'UNAVAILABLE' : 'PRELISTING',
+      error: error instanceof Error ? error.message : String(error)
+    })))
+  ]);
+
+  const markets = EXTENDED_MARKETS.map((config, index) => {
+    const perp = perps[config.perpSymbol];
+    const stock = stockResults[index];
+    const premiumPct = ((perp.markPrice / perp.oraclePrice) - 1) * 100;
+    return {
+      ...config,
+      listingStatus: stock.priceCny ? 'listed' : config.listed ? 'quote-unavailable' : 'preipo',
+      perp,
+      stock,
+      comparison: {
+        referenceUsd: perp.oraclePrice,
+        absoluteGapUsd: perp.markPrice - perp.oraclePrice,
+        premiumPct,
+        impliedUsdCnh: stock.priceCny ? stock.priceCny / perp.oraclePrice : null
+      }
+    };
+  });
+  const payload = { markets, fetchedAt: new Date().toISOString() };
+  extendedCache = { expiresAt: now + 10_000, payload };
+  return payload;
+}
+
 function sendJson(res, status, value) {
   res.writeHead(status, { 'content-type': MIME['.json'], 'cache-control': 'no-store' });
   res.end(JSON.stringify(value));
@@ -295,6 +381,9 @@ const server = http.createServer(async (req, res) => {
       const rawThreshold = Number(url.searchParams.get('threshold') ?? 10);
       const threshold = Number.isFinite(rawThreshold) ? Math.min(100, Math.max(0, rawThreshold)) : 10;
       return sendJson(res, 200, await getPerpSpreadPayload(threshold));
+    }
+    if (url.pathname === '/api/extended-markets') {
+      return sendJson(res, 200, await getExtendedMarketsPayload());
     }
     if (await serveStatic(url.pathname, res)) return;
     sendJson(res, 404, { error: 'Not found' });
